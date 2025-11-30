@@ -1,0 +1,4 @@
+selenium==4.15.0
+pyyaml==6.0
+pandas==2.1.1
+webdriver-manager>=4.0.0
