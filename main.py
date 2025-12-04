@@ -2,6 +2,9 @@ from utils.helpers import login, search_jobs, apply_jobs
 import os
 import sys
 
+# Force output to be unbuffered for real-time logging in CI
+sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
+
 def main():
     email = os.getenv("LI_EMAIL", "").strip()
     password = os.getenv("LI_PASSWORD", "").strip()
@@ -19,7 +22,9 @@ def main():
     apply_limit = 5
 
     print(f"Starting LinkedIn automation for '{keywords[0]}'...")
+    print("Step 1: Logging into LinkedIn...")
     driver = login(email, password)
+    print("Step 2: Searching for jobs...")
     job_links = search_jobs(driver, keywords, location)
     
     if not job_links:

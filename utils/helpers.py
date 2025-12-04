@@ -53,13 +53,17 @@ def login(email, password):
             service=Service(ChromeDriverManager().install()),
             options=chrome_options
         )
+    print("Loading LinkedIn login page...")
     driver.get("https://www.linkedin.com/login")
-    time.sleep(3)
+    time.sleep(2)
+    print("Login page loaded")
 
     # Fill in login credentials
+    print("Waiting for username field...")
     username_field = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.ID, "username"))
     )
+    print("Filling in credentials...")
     password_field = driver.find_element(By.ID, "password")
     
     username_field.clear()
@@ -68,26 +72,28 @@ def login(email, password):
     password_field.send_keys(password)
     
     # Click login button
+    print("Clicking login button...")
     login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
     login_button.click()
     
-    print(f"Attempting to log in as {email}")
-    time.sleep(8)
+    print(f"Login submitted for {email}")
+    print("Waiting for page to redirect...")
+    time.sleep(5)
     
     # Verify login was successful by checking if we're redirected away from login page
     current_url = driver.current_url
+    print(f"Current URL after login: {current_url}")
+    
     if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
         print("WARNING: LinkedIn is showing a security checkpoint/challenge page.")
         print("This usually means LinkedIn detected automated access.")
-        print(f"Current URL: {current_url}")
-        print("Waiting 10 seconds to see if checkpoint resolves...")
-        time.sleep(10)
+        print("Waiting 5 seconds to see if checkpoint resolves...")
+        time.sleep(5)
         current_url = driver.current_url
         if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
             print("Checkpoint still present. Continuing anyway...")
     elif "login" in current_url.lower():
         print("WARNING: Still on login page. Login might have failed.")
-        print(f"Current URL: {current_url}")
     else:
         print(f"Login successful! Redirected to: {current_url}")
     
@@ -100,31 +106,39 @@ def search_jobs(driver, keywords, location):
     for keyword in keywords:
         search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}"
         print(f"Searching for '{keyword}' in {location}...")
+        print(f"Loading URL: {search_url}")
         driver.get(search_url)
         
         # Wait for page to load - check if checkpoint page
-        time.sleep(8)
+        print("Waiting for job search page to load...")
+        time.sleep(5)
         current_url = driver.current_url
+        print(f"Current URL: {current_url}")
+        
         if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
             print("WARNING: Still on checkpoint page. Cannot search for jobs.")
             continue
         
         # Wait for job results container to appear
+        print("Looking for job results container...")
         try:
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".jobs-search-results-list, .scaffold-layout__list-container, ul.jobs-search__results-list")))
             print("Job results container found")
         except TimeoutException:
-            print("WARNING: Job results container not found. Page might not have loaded.")
+            print("WARNING: Job results container not found. Trying to continue anyway...")
         
         # Scroll down gradually to load more job listings
-        for i in range(5):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * " + str((i + 1) / 5) + ");")
-            time.sleep(2)
+        print("Scrolling to load job listings...")
+        for i in range(3):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * " + str((i + 1) / 3) + ");")
+            time.sleep(1)
         
         # Wait a bit more for dynamic content to load
-        time.sleep(3)
+        print("Waiting for dynamic content to load...")
+        time.sleep(2)
         
         # Try multiple selectors for job cards (LinkedIn changes these frequently)
+        print("Searching for job cards...")
         job_cards = []
         selectors = [
             "div.job-card-container",
@@ -140,26 +154,30 @@ def search_jobs(driver, keywords, location):
         
         for selector in selectors:
             try:
+                print(f"  Trying selector: {selector}")
                 job_cards = driver.find_elements(By.CSS_SELECTOR, selector)
                 if job_cards and len(job_cards) > 0:
-                    print(f"Found {len(job_cards)} job listings for '{keyword}' using selector: {selector}")
+                    print(f"✓ Found {len(job_cards)} job listings for '{keyword}' using selector: {selector}")
                     break
             except Exception as e:
+                print(f"  Selector {selector} failed: {str(e)[:50]}")
                 continue
         
         # If still no job cards, try finding by job links directly
         if not job_cards or len(job_cards) == 0:
-            print("Trying alternative method: searching for job links directly...")
+            print("No job cards found. Trying alternative method: searching for job links directly...")
             try:
                 job_links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/jobs/view/']")
                 if job_links:
-                    print(f"Found {len(job_links)} job links directly")
+                    print(f"✓ Found {len(job_links)} job links directly")
                     for link_elem in job_links:
                         link = link_elem.get_attribute("href")
                         if link and link not in all_job_links and "/jobs/view/" in link:
                             all_job_links.append(link)
+                    print(f"Total unique job links collected: {len(all_job_links)}")
                     continue
             except Exception as e:
+                print(f"Alternative method also failed: {str(e)[:50]}")
                 pass
         
         if not job_cards or len(job_cards) == 0:
@@ -174,7 +192,8 @@ def search_jobs(driver, keywords, location):
                 pass
             continue
 
-        for job in job_cards:
+        print(f"Extracting links from {len(job_cards)} job cards...")
+        for idx, job in enumerate(job_cards, 1):
             try:
                 # Try to find link in various ways
                 link = None
@@ -208,9 +227,14 @@ def search_jobs(driver, keywords, location):
                 
                 if link and link not in all_job_links and "/jobs/view/" in link:
                     all_job_links.append(link)
+                    if idx % 5 == 0:
+                        print(f"  Processed {idx}/{len(job_cards)} job cards, found {len(all_job_links)} unique links")
             except Exception as e:
                 continue
+        
+        print(f"Completed processing '{keyword}'. Total links so far: {len(all_job_links)}")
 
+    print(f"Job search complete. Found {len(all_job_links)} total unique job links")
     return all_job_links
 
 def apply_jobs(driver, job_links, apply_limit=5):
