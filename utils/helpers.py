@@ -248,13 +248,15 @@ def search_jobs(driver, keywords, location):
 def load_applied_jobs():
     """Load the applied jobs tracking file"""
     tracking_file = "applied_jobs.json"
-    if os.path.exists(tracking_file):
-        try:
+    try:
+        if os.path.exists(tracking_file):
             with open(tracking_file, 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        return {}
+    except Exception as e:
+        print(f"Warning: Error loading tracking file: {e}")
+        return {}
 
 def save_applied_jobs(tracking_data):
     """Save the applied jobs tracking file"""
@@ -365,11 +367,19 @@ def check_experience_level(driver):
         return True
 
 def apply_jobs(driver, job_links, apply_limit=5):
+    print("Initializing job application process...")
     applied_count = 0
     wait = WebDriverWait(driver, 10)
     
+    print("Loading application tracking data...")
     # Load tracking data
-    tracking_data = load_applied_jobs()
+    try:
+        tracking_data = load_applied_jobs()
+        print("Tracking data loaded successfully")
+    except Exception as e:
+        print(f"Warning: Could not load tracking data: {e}. Starting fresh.")
+        tracking_data = {}
+    
     today_count = get_today_applied_count(tracking_data)
     daily_limit = 5
     
@@ -387,6 +397,7 @@ def apply_jobs(driver, job_links, apply_limit=5):
     print(f"Daily limit: {daily_limit} | Already applied: {today_count} | Remaining slots: {remaining_slots}")
     print(f"{'='*60}\n")
     
+    print("Starting to process jobs...")
     for idx, link in enumerate(job_links, 1):
         # Check daily limit
         today_count = get_today_applied_count(tracking_data)
@@ -400,9 +411,16 @@ def apply_jobs(driver, job_links, apply_limit=5):
             continue
 
         print(f"\n[{idx}/{total_jobs}] Processing job...")
+        print(f"  Loading job page: {link[:80]}...")
         try:
+            # Set page load timeout
+            driver.set_page_load_timeout(15)
             driver.get(link)
+            print(f"  Page loaded successfully")
             time.sleep(2)  # Reduced from 3
+        except Exception as e:
+            print(f"  ✗ Error loading page: {str(e)[:100]}. Skipping...")
+            continue
 
             # Quick scroll to ensure page is loaded
             driver.execute_script("window.scrollTo(0, 300);")

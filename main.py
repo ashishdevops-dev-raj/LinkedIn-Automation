@@ -36,6 +36,7 @@ def main():
         print("  3. No jobs match the search criteria")
     else:
         print(f"Found {len(job_links)} total job links")
+        print("Step 3: Starting job application process...")
         apply_jobs(driver, job_links, apply_limit)
     
     print("All jobs processed successfully!")
