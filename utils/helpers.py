@@ -104,11 +104,13 @@ def search_jobs(driver, keywords, location):
     wait = WebDriverWait(driver, 20)
 
     for keyword in keywords:
-        # Add filters: Easy Apply (f_EA=true) and Experience level 0-2 years (f_E=1,2)
-        # f_E=1 means 0-1 years, f_E=2 means 1-2 years, so we use both
-        search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}&f_EA=true&f_E=1%2C2"
+        # Add filters: Easy Apply (f_EA=true), Experience level Entry level (f_E=2), and Recently Posted (f_TPR=r604800)
+        # f_E=2 is Entry level which typically means 0-2 years
+        # f_TPR=r604800 means posted in the past week (recently posted)
+        # We'll also verify experience level on each job page
+        search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}&f_EA=true&f_E=2&f_TPR=r604800"
         print(f"Searching for '{keyword}' in {location}...")
-        print("Filters: Easy Apply only, 0-2 years experience")
+        print("Filters: Easy Apply only, Entry level (0-2 years experience), Recently Posted (Past week)")
         print(f"Loading URL: {search_url}")
         driver.get(search_url)
         

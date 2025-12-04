@@ -23,7 +23,7 @@ def main():
     apply_limit = 5
 
     print(f"Starting LinkedIn automation for '{keywords[0]}'...")
-    print("Filters: Easy Apply only, 0-2 years experience")
+    print("Filters: Easy Apply only, 0-2 years experience, Recently Posted (Past week)")
     print("Step 1: Logging into LinkedIn...")
     driver = login(email, password)
     print("Step 2: Searching for jobs with filters (Easy Apply, 0-2 years exp)...")
