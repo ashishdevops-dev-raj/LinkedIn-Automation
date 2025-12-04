@@ -20,7 +20,7 @@ def main():
     
     keywords = ["DevOps Engineer"]
     location = "Bangalore, India"
-    apply_limit = 5
+    apply_limit = 5  # This is now just a maximum, daily limit is 5
 
     print(f"Starting LinkedIn automation for '{keywords[0]}'...")
     print("Filters: Easy Apply only, 0-2 years experience, Recently Posted (Past week)")

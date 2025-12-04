@@ -7,6 +7,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import json
+import os
+from datetime import datetime, date
 
 def login(email, password):
     chrome_options = Options()
@@ -242,6 +245,51 @@ def search_jobs(driver, keywords, location):
     print(f"Job search complete. Found {len(all_job_links)} total unique job links")
     return all_job_links
 
+def load_applied_jobs():
+    """Load the applied jobs tracking file"""
+    tracking_file = "applied_jobs.json"
+    if os.path.exists(tracking_file):
+        try:
+            with open(tracking_file, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_applied_jobs(tracking_data):
+    """Save the applied jobs tracking file"""
+    tracking_file = "applied_jobs.json"
+    try:
+        with open(tracking_file, 'w') as f:
+            json.dump(tracking_data, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not save applied jobs tracking: {e}")
+
+def get_today_applied_count(tracking_data):
+    """Get the count of jobs applied to today"""
+    today = str(date.today())
+    if today in tracking_data:
+        return len(tracking_data[today])
+    return 0
+
+def is_job_already_applied(job_link, tracking_data):
+    """Check if a job has already been applied to"""
+    today = str(date.today())
+    if today in tracking_data:
+        return job_link in tracking_data[today]
+    return False
+
+def mark_job_as_applied(job_link, tracking_data):
+    """Mark a job as applied for today"""
+    today = str(date.today())
+    if today not in tracking_data:
+        tracking_data[today] = []
+    
+    if job_link not in tracking_data[today]:
+        tracking_data[today].append(job_link)
+    
+    return tracking_data
+
 def check_experience_level(driver):
     """Check if job requires 0-2 years of experience"""
     try:
@@ -311,10 +359,30 @@ def check_experience_level(driver):
 def apply_jobs(driver, job_links, apply_limit=5):
     applied_count = 0
     wait = WebDriverWait(driver, 10)
+    
+    # Load tracking data
+    tracking_data = load_applied_jobs()
+    today_count = get_today_applied_count(tracking_data)
+    daily_limit = 5
+    
+    print(f"Daily application limit: {daily_limit}")
+    print(f"Already applied to {today_count} jobs today")
+    
+    if today_count >= daily_limit:
+        print(f"Daily limit of {daily_limit} applications reached. Skipping all jobs.")
+        return 0
 
     for link in job_links:
-        if applied_count >= apply_limit:
+        # Check daily limit
+        today_count = get_today_applied_count(tracking_data)
+        if today_count >= daily_limit:
+            print(f"Daily limit of {daily_limit} applications reached. Stopping.")
             break
+        
+        # Check if already applied to this job today
+        if is_job_already_applied(link, tracking_data):
+            print(f"Already applied to this job today. Skipping: {link}")
+            continue
 
         try:
             driver.get(link)
@@ -399,6 +467,13 @@ def apply_jobs(driver, job_links, apply_limit=5):
                         driver.execute_script("arguments[0].click();", submit_btn)
                         print(f"✓ Applied to job: {link}")
                         applied_count += 1
+                        
+                        # Mark job as applied in tracking data
+                        tracking_data = mark_job_as_applied(link, tracking_data)
+                        save_applied_jobs(tracking_data)
+                        today_count = get_today_applied_count(tracking_data)
+                        print(f"  Daily applications: {today_count}/{daily_limit}")
+                        
                         time.sleep(3)
                         break
                     except Exception as e:
@@ -468,5 +543,7 @@ def apply_jobs(driver, job_links, apply_limit=5):
             print(f"Error processing job {link}: {e}")
             continue
 
-    print(f"\nTotal jobs applied: {applied_count}/{len(job_links)}")
+    today_count = get_today_applied_count(tracking_data)
+    print(f"\nTotal jobs applied in this run: {applied_count}")
+    print(f"Total jobs applied today: {today_count}/{daily_limit}")
     return applied_count
