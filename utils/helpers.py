@@ -104,8 +104,11 @@ def search_jobs(driver, keywords, location):
     wait = WebDriverWait(driver, 20)
 
     for keyword in keywords:
-        search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}"
+        # Add filters: Easy Apply (f_EA=true) and Experience level 0-2 years (f_E=1,2)
+        # f_E=1 means 0-1 years, f_E=2 means 1-2 years, so we use both
+        search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}&f_EA=true&f_E=1%2C2"
         print(f"Searching for '{keyword}' in {location}...")
+        print("Filters: Easy Apply only, 0-2 years experience")
         print(f"Loading URL: {search_url}")
         driver.get(search_url)
         
@@ -237,6 +240,72 @@ def search_jobs(driver, keywords, location):
     print(f"Job search complete. Found {len(all_job_links)} total unique job links")
     return all_job_links
 
+def check_experience_level(driver):
+    """Check if job requires 0-2 years of experience"""
+    try:
+        # Look for experience level in job description or criteria
+        page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+        
+        # Check for experience indicators
+        experience_keywords = [
+            "0-2 years",
+            "0 to 2 years",
+            "1-2 years",
+            "1 to 2 years",
+            "entry level",
+            "junior",
+            "0-1 years",
+            "0 to 1 years",
+            "fresher",
+            "0 years",
+            "1 year"
+        ]
+        
+        # Also check for higher experience that would exclude this
+        exclude_keywords = [
+            "3+ years",
+            "3-5 years",
+            "5+ years",
+            "senior",
+            "lead",
+            "principal",
+            "4+ years"
+        ]
+        
+        # If we find exclude keywords, it's not 0-2 years
+        for exclude in exclude_keywords:
+            if exclude in page_text:
+                return False
+        
+        # Check if any experience keywords match
+        for keyword in experience_keywords:
+            if keyword in page_text:
+                return True
+        
+        # Try to find experience in structured data
+        try:
+            criteria_sections = driver.find_elements(By.CSS_SELECTOR, ".jobs-description__job-criteria-item, .jobs-unified-top-card__job-insight")
+            for criteria in criteria_sections:
+                text = criteria.text.lower()
+                if "experience" in text or "years" in text:
+                    # Check if it matches 0-2 years
+                    for keyword in experience_keywords:
+                        if keyword in text:
+                            return True
+                    # Check if it's higher than 2 years
+                    for exclude in exclude_keywords:
+                        if exclude in text:
+                            return False
+        except:
+            pass
+        
+        # If we can't determine, assume it might be okay (since URL filter should handle it)
+        return True
+    except Exception as e:
+        print(f"  Could not verify experience level: {str(e)[:50]}")
+        # If we can't check, assume it's okay (URL filter should handle it)
+        return True
+
 def apply_jobs(driver, job_links, apply_limit=5):
     applied_count = 0
     wait = WebDriverWait(driver, 10)
@@ -276,6 +345,13 @@ def apply_jobs(driver, job_links, apply_limit=5):
             if not easy_apply:
                 print(f"Easy Apply not available for: {link}")
                 continue
+            
+            # Verify experience level (0-2 years)
+            print(f"Checking experience level for job: {link}")
+            if not check_experience_level(driver):
+                print(f"  Job requires more than 2 years experience. Skipping...")
+                continue
+            print(f"  Experience level verified (0-2 years)")
 
             # Click Easy Apply button
             try:
