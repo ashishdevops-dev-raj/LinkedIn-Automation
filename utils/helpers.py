@@ -250,14 +250,18 @@ def search_jobs(driver, keywords, location):
 def load_applied_jobs():
     """Load the applied jobs tracking file"""
     tracking_file = "applied_jobs.json"
+    print(f"    [load_applied_jobs] Checking for file: {tracking_file}")
     try:
         if os.path.exists(tracking_file):
+            print(f"    [load_applied_jobs] File exists, reading...")
             with open(tracking_file, 'r') as f:
                 data = json.load(f)
+                print(f"    [load_applied_jobs] File read successfully")
                 return data if isinstance(data, dict) else {}
+        print(f"    [load_applied_jobs] File does not exist, returning empty dict")
         return {}
     except Exception as e:
-        print(f"Warning: Error loading tracking file: {e}")
+        print(f"    [load_applied_jobs] Warning: Error loading tracking file: {e}")
         return {}
 
 def save_applied_jobs(tracking_data):
@@ -271,9 +275,14 @@ def save_applied_jobs(tracking_data):
 
 def get_today_applied_count(tracking_data):
     """Get the count of jobs applied to today"""
+    print(f"    [get_today_applied_count] Getting today's date...")
     today = str(date.today())
+    print(f"    [get_today_applied_count] Today is: {today}")
     if today in tracking_data:
-        return len(tracking_data[today])
+        count = len(tracking_data[today])
+        print(f"    [get_today_applied_count] Found {count} applications for today")
+        return count
+    print(f"    [get_today_applied_count] No applications found for today")
     return 0
 
 def is_job_already_applied(job_link, tracking_data):
@@ -370,23 +379,30 @@ def check_experience_level(driver):
 
 def apply_jobs(driver, job_links, apply_limit=5):
     print("Initializing job application process...")
+    print("  Step 1: Setting up variables...")
     applied_count = 0
     wait = WebDriverWait(driver, 10)
+    print("  Step 1: Complete")
     
-    print("Loading application tracking data...")
+    print("  Step 2: Loading application tracking data...")
     # Load tracking data
     try:
         tracking_data = load_applied_jobs()
-        print("Tracking data loaded successfully")
+        print("  Step 2: Tracking data loaded successfully")
     except Exception as e:
-        print(f"Warning: Could not load tracking data: {e}. Starting fresh.")
+        print(f"  Step 2: Warning - Could not load tracking data: {e}. Starting fresh.")
         tracking_data = {}
+    print("  Step 2: Complete")
     
+    print("  Step 3: Getting today's application count...")
     today_count = get_today_applied_count(tracking_data)
+    print(f"  Step 3: Today's count = {today_count}")
     daily_limit = 5
+    print("  Step 3: Complete")
     
     print(f"Daily application limit: {daily_limit}")
     print(f"Already applied to {today_count} jobs today")
+    print("Initialization complete. Starting job processing...")
     
     if today_count >= daily_limit:
         print(f"Daily limit of {daily_limit} applications reached. Skipping all jobs.")
