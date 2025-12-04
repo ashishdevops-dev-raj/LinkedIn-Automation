@@ -378,6 +378,8 @@ def check_experience_level(driver):
         return True
 
 def apply_jobs(driver, job_links, apply_limit=5):
+    print(">>> apply_jobs() function called")
+    print(">>> Number of job links:", len(job_links))
     print("Initializing job application process...")
     print("  Step 1: Setting up variables...")
     applied_count = 0
@@ -397,7 +399,7 @@ def apply_jobs(driver, job_links, apply_limit=5):
     print("  Step 3: Getting today's application count...")
     today_count = get_today_applied_count(tracking_data)
     print(f"  Step 3: Today's count = {today_count}")
-    daily_limit = 5
+    daily_limit = 10
     print("  Step 3: Complete")
     
     print(f"Daily application limit: {daily_limit}")
@@ -440,49 +442,52 @@ def apply_jobs(driver, job_links, apply_limit=5):
             print(f"  ✗ Error loading page: {str(e)[:100]}. Skipping...")
             continue
 
-            # Quick scroll to ensure page is loaded
-            driver.execute_script("window.scrollTo(0, 300);")
-            time.sleep(1)  # Reduced from 2
+        # Quick scroll to ensure page is loaded
+        print(f"  Scrolling page...")
+        driver.execute_script("window.scrollTo(0, 300);")
+        time.sleep(1)  # Reduced from 2
 
-            # Try multiple selectors for Easy Apply button with shorter timeout
-            easy_apply = None
-            selectors = [
-                "button.jobs-apply-button",
-                "button[data-control-name='jobdetails_topcard_inapply']",
-                "button.jobs-s-apply__application-button",
-                "//button[contains(@aria-label, 'Easy Apply')]",
-                "//button[contains(text(), 'Easy Apply')]"
-            ]
+        # Try multiple selectors for Easy Apply button with shorter timeout
+        print(f"  Looking for Easy Apply button...")
+        easy_apply = None
+        selectors = [
+            "button.jobs-apply-button",
+            "button[data-control-name='jobdetails_topcard_inapply']",
+            "button.jobs-s-apply__application-button",
+            "//button[contains(@aria-label, 'Easy Apply')]",
+            "//button[contains(text(), 'Easy Apply')]"
+        ]
 
-            # Use shorter timeout for faster checking
-            quick_wait = WebDriverWait(driver, 3)
-            for selector in selectors:
-                try:
-                    if selector.startswith("//"):
-                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
-                    else:
-                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                    if easy_apply and easy_apply.is_displayed():
-                        break
-                    else:
-                        easy_apply = None
-                except (NoSuchElementException, TimeoutException):
-                    continue
-
-            if not easy_apply:
-                print(f"  ✗ Easy Apply not available. Skipping...")
-                continue
-            
-            # Quick experience level check (with timeout)
-            print(f"  Checking experience level...")
+        # Use shorter timeout for faster checking
+        quick_wait = WebDriverWait(driver, 3)
+        for selector in selectors:
             try:
-                if not check_experience_level(driver):
-                    print(f"  ✗ Requires more than 2 years experience. Skipping...")
-                    continue
-            except Exception as e:
-                print(f"  ⚠ Could not verify experience, continuing anyway...")
-            
-            print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
+                if selector.startswith("//"):
+                    easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                else:
+                    easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                if easy_apply and easy_apply.is_displayed():
+                    print(f"  ✓ Easy Apply button found using: {selector}")
+                    break
+                else:
+                    easy_apply = None
+            except (NoSuchElementException, TimeoutException):
+                continue
+
+        if not easy_apply:
+            print(f"  ✗ Easy Apply not available. Skipping...")
+            continue
+        
+        # Quick experience level check (with timeout)
+        print(f"  Checking experience level...")
+        try:
+            if not check_experience_level(driver):
+                print(f"  ✗ Requires more than 2 years experience. Skipping...")
+                continue
+        except Exception as e:
+            print(f"  ⚠ Could not verify experience: {str(e)[:50]}. Continuing anyway...")
+        
+        print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
 
             # Click Easy Apply button
             print(f"  Clicking Easy Apply button...")
