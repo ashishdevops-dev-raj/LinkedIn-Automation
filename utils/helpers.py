@@ -489,100 +489,100 @@ def apply_jobs(driver, job_links, apply_limit=5):
         
         print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
 
-            # Click Easy Apply button
-            print(f"  Clicking Easy Apply button...")
-            try:
-                driver.execute_script("arguments[0].click();", easy_apply)
-                time.sleep(2)  # Reduced from 3
-            except ElementClickInterceptedException:
-                print(f"  ✗ Could not click Easy Apply button. Skipping...")
-                continue
+        # Click Easy Apply button
+        print(f"  Clicking Easy Apply button...")
+        try:
+            driver.execute_script("arguments[0].click();", easy_apply)
+            time.sleep(2)  # Reduced from 3
+        except ElementClickInterceptedException:
+            print(f"  ✗ Could not click Easy Apply button. Skipping...")
+            continue
 
-            # Handle multi-step application process
-            print(f"  Processing application form...")
-            max_steps = 5
-            step = 0
+        # Handle multi-step application process
+        print(f"  Processing application form...")
+        max_steps = 5
+        step = 0
+        
+        while step < max_steps:
+            step += 1
+            time.sleep(1)  # Reduced from 2
             
-            while step < max_steps:
-                step += 1
-                time.sleep(1)  # Reduced from 2
-                
-                # Check if there's a submit button
-                submit_selectors = [
-                    "button[aria-label='Submit application']",
-                    "button[aria-label='Submit']",
-                    "//button[contains(@aria-label, 'Submit')]",
-                    "button.jobs-s-apply__application-button--submit"
-                ]
-                
-                submit_btn = None
-                for selector in submit_selectors:
-                    try:
-                        if selector.startswith("//"):
-                            submit_btn = driver.find_element(By.XPATH, selector)
-                        else:
-                            submit_btn = driver.find_element(By.CSS_SELECTOR, selector)
-                        if submit_btn and submit_btn.is_displayed() and submit_btn.is_enabled():
-                            break
-                    except NoSuchElementException:
-                        continue
-
-                if submit_btn:
-                    try:
-                        # Scroll to submit button
-                        driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
-                        time.sleep(0.5)  # Reduced from 1
-                        driver.execute_script("arguments[0].click();", submit_btn)
-                        print(f"  ✓ Successfully applied to job!")
-                        applied_count += 1
-                        
-                        # Mark job as applied in tracking data
-                        tracking_data = mark_job_as_applied(link, tracking_data)
-                        save_applied_jobs(tracking_data)
-                        today_count = get_today_applied_count(tracking_data)
-                        print(f"  Daily applications: {today_count}/{daily_limit}")
-                        
-                        time.sleep(2)  # Reduced from 3
+            # Check if there's a submit button
+            submit_selectors = [
+                "button[aria-label='Submit application']",
+                "button[aria-label='Submit']",
+                "//button[contains(@aria-label, 'Submit')]",
+                "button.jobs-s-apply__application-button--submit"
+            ]
+            
+            submit_btn = None
+            for selector in submit_selectors:
+                try:
+                    if selector.startswith("//"):
+                        submit_btn = driver.find_element(By.XPATH, selector)
+                    else:
+                        submit_btn = driver.find_element(By.CSS_SELECTOR, selector)
+                    if submit_btn and submit_btn.is_displayed() and submit_btn.is_enabled():
                         break
-                    except Exception as e:
-                        print(f"  ✗ Error clicking submit button: {str(e)[:50]}")
-                        break
+                except NoSuchElementException:
+                    continue
 
-                # Check for "Next" button to continue multi-step form
-                next_selectors = [
-                    "button[aria-label='Continue to next step']",
-                    "button[aria-label='Next']",
-                    "//button[contains(@aria-label, 'Next')]",
-                    "//button[contains(@aria-label, 'Continue')]"
-                ]
-                
-                next_btn = None
-                for selector in next_selectors:
-                    try:
-                        if selector.startswith("//"):
-                            next_btn = driver.find_element(By.XPATH, selector)
-                        else:
-                            next_btn = driver.find_element(By.CSS_SELECTOR, selector)
-                        if next_btn.is_displayed() and next_btn.is_enabled():
-                            break
-                    except NoSuchElementException:
-                        continue
-
-                if next_btn:
-                    try:
-                        driver.execute_script("arguments[0].click();", next_btn)
-                        time.sleep(1)  # Reduced from 2
-                        continue
-                    except Exception as e:
-                        print(f"  ✗ Error clicking next button: {str(e)[:50]}")
-                        break
-                else:
-                    # No next or submit button found, might be stuck
-                    print(f"  ✗ Could not find submit/next button. Skipping...")
+            if submit_btn:
+                try:
+                    # Scroll to submit button
+                    driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
+                    time.sleep(0.5)  # Reduced from 1
+                    driver.execute_script("arguments[0].click();", submit_btn)
+                    print(f"  ✓ Successfully applied to job!")
+                    applied_count += 1
+                    
+                    # Mark job as applied in tracking data
+                    tracking_data = mark_job_as_applied(link, tracking_data)
+                    save_applied_jobs(tracking_data)
+                    today_count = get_today_applied_count(tracking_data)
+                    print(f"  Daily applications: {today_count}/{daily_limit}")
+                    
+                    time.sleep(2)  # Reduced from 3
+                    break
+                except Exception as e:
+                    print(f"  ✗ Error clicking submit button: {str(e)[:50]}")
                     break
 
-            # Close modal if still open
-            time.sleep(1)  # Reduced from 2
+            # Check for "Next" button to continue multi-step form
+            next_selectors = [
+                "button[aria-label='Continue to next step']",
+                "button[aria-label='Next']",
+                "//button[contains(@aria-label, 'Next')]",
+                "//button[contains(@aria-label, 'Continue')]"
+            ]
+            
+            next_btn = None
+            for selector in next_selectors:
+                try:
+                    if selector.startswith("//"):
+                        next_btn = driver.find_element(By.XPATH, selector)
+                    else:
+                        next_btn = driver.find_element(By.CSS_SELECTOR, selector)
+                    if next_btn.is_displayed() and next_btn.is_enabled():
+                        break
+                except NoSuchElementException:
+                    continue
+
+            if next_btn:
+                try:
+                    driver.execute_script("arguments[0].click();", next_btn)
+                    time.sleep(1)  # Reduced from 2
+                    continue
+                except Exception as e:
+                    print(f"  ✗ Error clicking next button: {str(e)[:50]}")
+                    break
+            else:
+                # No next or submit button found, might be stuck
+                print(f"  ✗ Could not find submit/next button. Skipping...")
+                break
+
+        # Close modal if still open
+        time.sleep(1)  # Reduced from 2
             close_selectors = [
                 ".artdeco-modal__dismiss",
                 "button[aria-label='Dismiss']",
