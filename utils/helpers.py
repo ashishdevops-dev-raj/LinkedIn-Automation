@@ -451,28 +451,68 @@ def apply_jobs(driver, job_links, apply_limit=5):
                 "button.jobs-apply-button",
                 "button[data-control-name='jobdetails_topcard_inapply']",
                 "button.jobs-s-apply__application-button",
+                "button[aria-label*='Easy Apply']",
+                "button[aria-label*='easy apply']",
                 "//button[contains(@aria-label, 'Easy Apply')]",
-                "//button[contains(text(), 'Easy Apply')]"
+                "//button[contains(@aria-label, 'easy apply')]",
+                "//button[contains(text(), 'Easy Apply')]",
+                "//button[contains(text(), 'easy apply')]",
+                "//button[contains(., 'Easy Apply')]",
+                "button.jobs-apply-button--top-card",
+                ".jobs-apply-button",
+                "button[data-control-name='jobdetails_topcard_inapply']",
+                "//span[contains(text(), 'Easy Apply')]/ancestor::button",
+                "//span[contains(text(), 'easy apply')]/ancestor::button"
             ]
 
             # Use shorter timeout for faster checking
-            quick_wait = WebDriverWait(driver, 3)
+            quick_wait = WebDriverWait(driver, 5)
             for selector in selectors:
                 try:
                     if selector.startswith("//"):
-                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
+                        elements = driver.find_elements(By.XPATH, selector)
                     else:
-                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                    if easy_apply and easy_apply.is_displayed():
-                        print(f"  ✓ Easy Apply button found using: {selector}")
+                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    
+                    for elem in elements:
+                        if elem and elem.is_displayed():
+                            # Check if it's actually an Easy Apply button
+                            text = elem.text.lower()
+                            aria_label = elem.get_attribute("aria-label") or ""
+                            if "easy apply" in text or "easy apply" in aria_label.lower():
+                                easy_apply = elem
+                                print(f"  ✓ Easy Apply button found using: {selector}")
+                                break
+                    
+                    if easy_apply:
                         break
-                    else:
-                        easy_apply = None
-                except (NoSuchElementException, TimeoutException):
+                except (NoSuchElementException, TimeoutException, Exception) as e:
                     continue
+
+            # If still not found, try to find any apply button and check its text
+            if not easy_apply:
+                try:
+                    all_buttons = driver.find_elements(By.TAG_NAME, "button")
+                    for btn in all_buttons:
+                        if btn.is_displayed():
+                            btn_text = btn.text.lower()
+                            btn_aria = (btn.get_attribute("aria-label") or "").lower()
+                            if "easy apply" in btn_text or "easy apply" in btn_aria:
+                                easy_apply = btn
+                                print(f"  ✓ Easy Apply button found by searching all buttons")
+                                break
+                except:
+                    pass
 
             if not easy_apply:
                 print(f"  ✗ Easy Apply not available. Skipping...")
+                # Debug: Check what apply buttons are available
+                try:
+                    apply_buttons = driver.find_elements(By.XPATH, "//button[contains(., 'Apply') or contains(@aria-label, 'Apply')]")
+                    if apply_buttons:
+                        print(f"  Debug: Found {len(apply_buttons)} apply-related buttons, but none are Easy Apply")
+                except:
+                    pass
                 continue
             
             # Quick experience level check (with timeout)
