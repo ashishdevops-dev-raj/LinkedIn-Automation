@@ -291,10 +291,18 @@ def mark_job_as_applied(job_link, tracking_data):
     return tracking_data
 
 def check_experience_level(driver):
-    """Check if job requires 0-2 years of experience"""
+    """Check if job requires 0-2 years of experience - optimized for speed"""
     try:
-        # Look for experience level in job description or criteria
-        page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+        # Quick check - look for experience level in visible text first
+        # Try to get just the job description section instead of entire page
+        page_text = ""
+        try:
+            # Try to get job description section first (faster)
+            desc_section = driver.find_element(By.CSS_SELECTOR, ".jobs-description__text, .jobs-box__html-content, .show-more-less-html__markup")
+            page_text = desc_section.text.lower()
+        except:
+            # Fallback to body if description section not found
+            page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
         
         # Check for experience indicators
         experience_keywords = [
@@ -372,27 +380,35 @@ def apply_jobs(driver, job_links, apply_limit=5):
         print(f"Daily limit of {daily_limit} applications reached. Skipping all jobs.")
         return 0
 
-    for link in job_links:
+    total_jobs = len(job_links)
+    remaining_slots = daily_limit - today_count
+    print(f"\n{'='*60}")
+    print(f"Processing {total_jobs} job links...")
+    print(f"Daily limit: {daily_limit} | Already applied: {today_count} | Remaining slots: {remaining_slots}")
+    print(f"{'='*60}\n")
+    
+    for idx, link in enumerate(job_links, 1):
         # Check daily limit
         today_count = get_today_applied_count(tracking_data)
         if today_count >= daily_limit:
-            print(f"Daily limit of {daily_limit} applications reached. Stopping.")
+            print(f"\nDaily limit of {daily_limit} applications reached. Stopping.")
             break
         
         # Check if already applied to this job today
         if is_job_already_applied(link, tracking_data):
-            print(f"Already applied to this job today. Skipping: {link}")
+            print(f"[{idx}/{total_jobs}] Already applied. Skipping...")
             continue
 
+        print(f"\n[{idx}/{total_jobs}] Processing job...")
         try:
             driver.get(link)
-            time.sleep(3)
+            time.sleep(2)  # Reduced from 3
 
-            # Scroll to ensure page is loaded
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-            time.sleep(2)
+            # Quick scroll to ensure page is loaded
+            driver.execute_script("window.scrollTo(0, 300);")
+            time.sleep(1)  # Reduced from 2
 
-            # Try multiple selectors for Easy Apply button
+            # Try multiple selectors for Easy Apply button with shorter timeout
             easy_apply = None
             selectors = [
                 "button.jobs-apply-button",
@@ -402,42 +418,53 @@ def apply_jobs(driver, job_links, apply_limit=5):
                 "//button[contains(text(), 'Easy Apply')]"
             ]
 
+            # Use shorter timeout for faster checking
+            quick_wait = WebDriverWait(driver, 3)
             for selector in selectors:
                 try:
                     if selector.startswith("//"):
-                        easy_apply = wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
+                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
                     else:
-                        easy_apply = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-                    break
+                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                    if easy_apply and easy_apply.is_displayed():
+                        break
+                    else:
+                        easy_apply = None
                 except (NoSuchElementException, TimeoutException):
                     continue
 
             if not easy_apply:
-                print(f"Easy Apply not available for: {link}")
+                print(f"  ✗ Easy Apply not available. Skipping...")
                 continue
             
-            # Verify experience level (0-2 years)
-            print(f"Checking experience level for job: {link}")
-            if not check_experience_level(driver):
-                print(f"  Job requires more than 2 years experience. Skipping...")
-                continue
-            print(f"  Experience level verified (0-2 years)")
+            # Quick experience level check (with timeout)
+            print(f"  Checking experience level...")
+            try:
+                if not check_experience_level(driver):
+                    print(f"  ✗ Requires more than 2 years experience. Skipping...")
+                    continue
+            except Exception as e:
+                print(f"  ⚠ Could not verify experience, continuing anyway...")
+            
+            print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
 
             # Click Easy Apply button
+            print(f"  Clicking Easy Apply button...")
             try:
                 driver.execute_script("arguments[0].click();", easy_apply)
-                time.sleep(3)
+                time.sleep(2)  # Reduced from 3
             except ElementClickInterceptedException:
-                print(f"Could not click Easy Apply button for: {link}")
+                print(f"  ✗ Could not click Easy Apply button. Skipping...")
                 continue
 
             # Handle multi-step application process
+            print(f"  Processing application form...")
             max_steps = 5
             step = 0
             
             while step < max_steps:
                 step += 1
-                time.sleep(2)
+                time.sleep(1)  # Reduced from 2
                 
                 # Check if there's a submit button
                 submit_selectors = [
@@ -454,7 +481,7 @@ def apply_jobs(driver, job_links, apply_limit=5):
                             submit_btn = driver.find_element(By.XPATH, selector)
                         else:
                             submit_btn = driver.find_element(By.CSS_SELECTOR, selector)
-                        if submit_btn.is_displayed() and submit_btn.is_enabled():
+                        if submit_btn and submit_btn.is_displayed() and submit_btn.is_enabled():
                             break
                     except NoSuchElementException:
                         continue
@@ -463,9 +490,9 @@ def apply_jobs(driver, job_links, apply_limit=5):
                     try:
                         # Scroll to submit button
                         driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
-                        time.sleep(1)
+                        time.sleep(0.5)  # Reduced from 1
                         driver.execute_script("arguments[0].click();", submit_btn)
-                        print(f"✓ Applied to job: {link}")
+                        print(f"  ✓ Successfully applied to job!")
                         applied_count += 1
                         
                         # Mark job as applied in tracking data
@@ -474,10 +501,10 @@ def apply_jobs(driver, job_links, apply_limit=5):
                         today_count = get_today_applied_count(tracking_data)
                         print(f"  Daily applications: {today_count}/{daily_limit}")
                         
-                        time.sleep(3)
+                        time.sleep(2)  # Reduced from 3
                         break
                     except Exception as e:
-                        print(f"Error clicking submit button: {e}")
+                        print(f"  ✗ Error clicking submit button: {str(e)[:50]}")
                         break
 
                 # Check for "Next" button to continue multi-step form
@@ -503,18 +530,18 @@ def apply_jobs(driver, job_links, apply_limit=5):
                 if next_btn:
                     try:
                         driver.execute_script("arguments[0].click();", next_btn)
-                        time.sleep(2)
+                        time.sleep(1)  # Reduced from 2
                         continue
                     except Exception as e:
-                        print(f"Error clicking next button: {e}")
+                        print(f"  ✗ Error clicking next button: {str(e)[:50]}")
                         break
                 else:
                     # No next or submit button found, might be stuck
-                    print(f"Could not find submit/next button for: {link}")
+                    print(f"  ✗ Could not find submit/next button. Skipping...")
                     break
 
             # Close modal if still open
-            time.sleep(2)
+            time.sleep(1)  # Reduced from 2
             close_selectors = [
                 ".artdeco-modal__dismiss",
                 "button[aria-label='Dismiss']",
