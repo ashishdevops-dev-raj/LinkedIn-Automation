@@ -505,15 +505,46 @@ def apply_jobs(driver, job_links, apply_limit=5):
                     pass
 
             if not easy_apply:
-                print(f"  ✗ Easy Apply not available. Skipping...")
-                # Debug: Check what apply buttons are available
+                # Debug: Check what apply buttons are available and their text
                 try:
                     apply_buttons = driver.find_elements(By.XPATH, "//button[contains(., 'Apply') or contains(@aria-label, 'Apply')]")
                     if apply_buttons:
-                        print(f"  Debug: Found {len(apply_buttons)} apply-related buttons, but none are Easy Apply")
-                except:
-                    pass
-                continue
+                        print(f"  Debug: Found {len(apply_buttons)} apply-related buttons:")
+                        for i, btn in enumerate(apply_buttons[:3], 1):  # Show first 3
+                            try:
+                                btn_text = btn.text.strip()
+                                btn_aria = btn.get_attribute("aria-label") or ""
+                                btn_class = btn.get_attribute("class") or ""
+                                print(f"    Button {i}: text='{btn_text[:50]}', aria-label='{btn_aria[:50]}', class='{btn_class[:50]}'")
+                            except:
+                                pass
+                        
+                        # Try to use the first apply button if it looks like it could be Easy Apply
+                        # Sometimes LinkedIn uses "Apply" instead of "Easy Apply" in the button text
+                        for btn in apply_buttons:
+                            try:
+                                if btn.is_displayed():
+                                    btn_text = (btn.text or "").lower()
+                                    btn_aria = (btn.get_attribute("aria-label") or "").lower()
+                                    btn_id = btn.get_attribute("id") or ""
+                                    
+                                    # Check if it's likely an Easy Apply button (not a regular apply)
+                                    # Easy Apply buttons usually don't have "company website" or "external" in them
+                                    if "company website" not in btn_text and "external" not in btn_text:
+                                        # Check for Easy Apply indicators in class or data attributes
+                                        btn_data = btn.get_attribute("data-control-name") or ""
+                                        if "inapply" in btn_data.lower() or "easy" in btn_text or "easy" in btn_aria:
+                                            easy_apply = btn
+                                            print(f"  ✓ Found Easy Apply button (alternative detection)")
+                                            break
+                            except:
+                                continue
+                except Exception as e:
+                    print(f"  Debug error: {str(e)[:50]}")
+                
+                if not easy_apply:
+                    print(f"  ✗ Easy Apply not available. Skipping...")
+                    continue
             
             # Quick experience level check (with timeout)
             print(f"  Checking experience level...")
