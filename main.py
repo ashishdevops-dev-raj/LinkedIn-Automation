@@ -14,11 +14,11 @@ def main():
         print(f"LI_PASSWORD is set: {bool(password and password != 'YOUR_PASSWORD')}")
         sys.exit(1)
     
-    keywords = ["DevOps Engineer", "Cloud Engineer"]
+    keywords = ["DevOps Engineer"]
     location = "Bangalore, India"
     apply_limit = 5
 
-    print(f"Starting LinkedIn automation for {len(keywords)} keywords...")
+    print(f"Starting LinkedIn automation for '{keywords[0]}'...")
     driver = login(email, password)
     job_links = search_jobs(driver, keywords, location)
     

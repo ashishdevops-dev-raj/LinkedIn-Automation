@@ -33,6 +33,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
+      - name: Verify Secrets
+        run: |
+          if [ -z "${{ secrets.LI_EMAIL }}" ]; then
+            echo "ERROR: LI_EMAIL secret is not set!"
+            echo "Please go to Settings > Secrets and variables > Actions and add LI_EMAIL"
+            exit 1
+          fi
+          if [ -z "${{ secrets.LI_PASSWORD }}" ]; then
+            echo "ERROR: LI_PASSWORD secret is not set!"
+            echo "Please go to Settings > Secrets and variables > Actions and add LI_PASSWORD"
+            exit 1
+          fi
+          echo "✓ Secrets are configured"
+
       - name: Run QuickApply Bot
         env:
           LI_EMAIL: ${{ secrets.LI_EMAIL }}

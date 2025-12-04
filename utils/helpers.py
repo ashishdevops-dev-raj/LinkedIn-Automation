@@ -22,6 +22,11 @@ def login(email, password):
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-software-rasterizer")
     chrome_options.add_argument("--remote-debugging-port=9222")
+    # Add user agent to appear more like a real browser
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    # Exclude automation flags
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
     
     # In CI environments, ChromeDriver should be in PATH from setup-chrome action
     # Otherwise, use ChromeDriverManager
@@ -67,11 +72,20 @@ def login(email, password):
     login_button.click()
     
     print(f"Attempting to log in as {email}")
-    time.sleep(5)
+    time.sleep(8)
     
     # Verify login was successful by checking if we're redirected away from login page
     current_url = driver.current_url
-    if "login" in current_url.lower():
+    if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
+        print("WARNING: LinkedIn is showing a security checkpoint/challenge page.")
+        print("This usually means LinkedIn detected automated access.")
+        print(f"Current URL: {current_url}")
+        print("Waiting 10 seconds to see if checkpoint resolves...")
+        time.sleep(10)
+        current_url = driver.current_url
+        if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
+            print("Checkpoint still present. Continuing anyway...")
+    elif "login" in current_url.lower():
         print("WARNING: Still on login page. Login might have failed.")
         print(f"Current URL: {current_url}")
     else:
@@ -81,45 +95,81 @@ def login(email, password):
 
 def search_jobs(driver, keywords, location):
     all_job_links = []
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 20)
 
     for keyword in keywords:
         search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}"
         print(f"Searching for '{keyword}' in {location}...")
         driver.get(search_url)
         
-        # Wait for page to load and scroll to load more jobs
-        time.sleep(5)
+        # Wait for page to load - check if checkpoint page
+        time.sleep(8)
+        current_url = driver.current_url
+        if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
+            print("WARNING: Still on checkpoint page. Cannot search for jobs.")
+            continue
         
-        # Scroll down to load more job listings
-        for i in range(3):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        # Wait for job results container to appear
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".jobs-search-results-list, .scaffold-layout__list-container, ul.jobs-search__results-list")))
+            print("Job results container found")
+        except TimeoutException:
+            print("WARNING: Job results container not found. Page might not have loaded.")
+        
+        # Scroll down gradually to load more job listings
+        for i in range(5):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * " + str((i + 1) / 5) + ");")
             time.sleep(2)
+        
+        # Wait a bit more for dynamic content to load
+        time.sleep(3)
         
         # Try multiple selectors for job cards (LinkedIn changes these frequently)
         job_cards = []
         selectors = [
-            ".job-card-container--clickable",
-            ".jobs-search-results__list-item",
+            "div.job-card-container",
+            "li.job-card-list__entity-lockup",
             "div[data-job-id]",
             ".job-card-list__entity-lockup",
-            "li.jobs-search-results__list-item"
+            "li.jobs-search-results__list-item",
+            ".jobs-search-results__list-item",
+            "div.job-card-container--clickable",
+            "a.job-card-list__title",
+            "div.base-card"
         ]
         
         for selector in selectors:
             try:
                 job_cards = driver.find_elements(By.CSS_SELECTOR, selector)
-                if job_cards:
+                if job_cards and len(job_cards) > 0:
                     print(f"Found {len(job_cards)} job listings for '{keyword}' using selector: {selector}")
                     break
             except Exception as e:
                 continue
         
-        if not job_cards:
-            print(f"WARNING: No job cards found for '{keyword}'. Current URL: {driver.current_url}")
-            # Take a screenshot for debugging (in headless mode, this might not work)
+        # If still no job cards, try finding by job links directly
+        if not job_cards or len(job_cards) == 0:
+            print("Trying alternative method: searching for job links directly...")
             try:
-                driver.save_screenshot(f"debug_{keyword.replace(' ', '_')}.png")
+                job_links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/jobs/view/']")
+                if job_links:
+                    print(f"Found {len(job_links)} job links directly")
+                    for link_elem in job_links:
+                        link = link_elem.get_attribute("href")
+                        if link and link not in all_job_links and "/jobs/view/" in link:
+                            all_job_links.append(link)
+                    continue
+            except Exception as e:
+                pass
+        
+        if not job_cards or len(job_cards) == 0:
+            print(f"WARNING: No job cards found for '{keyword}'. Current URL: {driver.current_url}")
+            print("Page title:", driver.title)
+            # Try to get page source snippet for debugging
+            try:
+                page_source = driver.page_source[:500]
+                if "checkpoint" in page_source.lower() or "challenge" in page_source.lower():
+                    print("Checkpoint/challenge detected in page source")
             except:
                 pass
             continue
@@ -128,11 +178,19 @@ def search_jobs(driver, keywords, location):
             try:
                 # Try to find link in various ways
                 link = None
+                # Method 1: Find anchor tag within job card
                 try:
-                    link_element = job.find_element(By.TAG_NAME, "a")
-                    link = link_element.get_attribute("href")
+                    link_elements = job.find_elements(By.TAG_NAME, "a")
+                    for link_elem in link_elements:
+                        href = link_elem.get_attribute("href")
+                        if href and "/jobs/view/" in href:
+                            link = href
+                            break
                 except:
-                    # Try finding by data attributes
+                    pass
+                
+                # Method 2: Try finding by data attributes
+                if not link:
                     try:
                         job_id = job.get_attribute("data-job-id")
                         if job_id:
@@ -140,9 +198,17 @@ def search_jobs(driver, keywords, location):
                     except:
                         pass
                 
-                if link and link not in all_job_links:
+                # Method 3: Try finding parent link
+                if not link:
+                    try:
+                        parent = job.find_element(By.XPATH, "./ancestor::a[contains(@href, '/jobs/view/')]")
+                        link = parent.get_attribute("href")
+                    except:
+                        pass
+                
+                if link and link not in all_job_links and "/jobs/view/" in link:
                     all_job_links.append(link)
-            except NoSuchElementException:
+            except Exception as e:
                 continue
 
     return all_job_links
