@@ -56,6 +56,8 @@ def login(email, password):
             service=Service(ChromeDriverManager().install()),
             options=chrome_options
         )
+    # Set page load timeout to prevent infinite waits
+    driver.set_page_load_timeout(30)
     print("Loading LinkedIn login page...")
     driver.get("https://www.linkedin.com/login")
     time.sleep(2)
@@ -584,8 +586,11 @@ def apply_jobs(driver, job_links, apply_limit=5):
                 except:
                     pass
 
+        except TimeoutException as e:
+            print(f"  ✗ Timeout error processing job: {str(e)[:100]}. Skipping...")
+            continue
         except Exception as e:
-            print(f"Error processing job {link}: {e}")
+            print(f"  ✗ Error processing job: {str(e)[:100]}. Skipping...")
             continue
 
     today_count = get_today_applied_count(tracking_data)
