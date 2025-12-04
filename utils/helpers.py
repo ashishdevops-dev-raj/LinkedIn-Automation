@@ -49,31 +49,99 @@ def login(email, password):
             options=chrome_options
         )
     driver.get("https://www.linkedin.com/login")
-    time.sleep(2)
+    time.sleep(3)
 
-    driver.find_element(By.ID, "username").send_keys(email)
-    driver.find_element(By.ID, "password").send_keys(password)
-    driver.find_element(By.XPATH, "//button[@type='submit']").click()
-    print(f"Logged in as {email}")
+    # Fill in login credentials
+    username_field = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "username"))
+    )
+    password_field = driver.find_element(By.ID, "password")
+    
+    username_field.clear()
+    username_field.send_keys(email)
+    password_field.clear()
+    password_field.send_keys(password)
+    
+    # Click login button
+    login_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+    login_button.click()
+    
+    print(f"Attempting to log in as {email}")
     time.sleep(5)
+    
+    # Verify login was successful by checking if we're redirected away from login page
+    current_url = driver.current_url
+    if "login" in current_url.lower():
+        print("WARNING: Still on login page. Login might have failed.")
+        print(f"Current URL: {current_url}")
+    else:
+        print(f"Login successful! Redirected to: {current_url}")
+    
     return driver
 
 def search_jobs(driver, keywords, location):
     all_job_links = []
+    wait = WebDriverWait(driver, 15)
 
     for keyword in keywords:
         search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword.replace(' ', '%20')}&location={location.replace(' ', '%20')}"
+        print(f"Searching for '{keyword}' in {location}...")
         driver.get(search_url)
+        
+        # Wait for page to load and scroll to load more jobs
         time.sleep(5)
-
-        # Updated LinkedIn job card selector
-        job_cards = driver.find_elements(By.CSS_SELECTOR, ".job-card-container--clickable")
-        print(f"Found {len(job_cards)} job listings for '{keyword}'")
+        
+        # Scroll down to load more job listings
+        for i in range(3):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+        
+        # Try multiple selectors for job cards (LinkedIn changes these frequently)
+        job_cards = []
+        selectors = [
+            ".job-card-container--clickable",
+            ".jobs-search-results__list-item",
+            "div[data-job-id]",
+            ".job-card-list__entity-lockup",
+            "li.jobs-search-results__list-item"
+        ]
+        
+        for selector in selectors:
+            try:
+                job_cards = driver.find_elements(By.CSS_SELECTOR, selector)
+                if job_cards:
+                    print(f"Found {len(job_cards)} job listings for '{keyword}' using selector: {selector}")
+                    break
+            except Exception as e:
+                continue
+        
+        if not job_cards:
+            print(f"WARNING: No job cards found for '{keyword}'. Current URL: {driver.current_url}")
+            # Take a screenshot for debugging (in headless mode, this might not work)
+            try:
+                driver.save_screenshot(f"debug_{keyword.replace(' ', '_')}.png")
+            except:
+                pass
+            continue
 
         for job in job_cards:
             try:
-                link = job.find_element(By.TAG_NAME, "a").get_attribute("href")
-                all_job_links.append(link)
+                # Try to find link in various ways
+                link = None
+                try:
+                    link_element = job.find_element(By.TAG_NAME, "a")
+                    link = link_element.get_attribute("href")
+                except:
+                    # Try finding by data attributes
+                    try:
+                        job_id = job.get_attribute("data-job-id")
+                        if job_id:
+                            link = f"https://www.linkedin.com/jobs/view/{job_id}"
+                    except:
+                        pass
+                
+                if link and link not in all_job_links:
+                    all_job_links.append(link)
             except NoSuchElementException:
                 continue
 
