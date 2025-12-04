@@ -10,16 +10,44 @@ import time
 
 def login(email, password):
     chrome_options = Options()
-    # REMOVE --headless for local testing
-    # chrome_options.add_argument("--headless")
+    # Enable headless mode for CI environments
+    import os
+    if os.getenv('CI') or os.getenv('GITHUB_ACTIONS'):
+        chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=chrome_options
-    )
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--remote-debugging-port=9222")
+    
+    # In CI environments, ChromeDriver should be in PATH from setup-chrome action
+    # Otherwise, use ChromeDriverManager
+    if os.getenv('CI') or os.getenv('GITHUB_ACTIONS'):
+        # Try to use ChromeDriver from PATH first, fallback to ChromeDriverManager
+        try:
+            import shutil
+            chromedriver_path = shutil.which('chromedriver')
+            if chromedriver_path:
+                driver = webdriver.Chrome(
+                    service=Service(chromedriver_path),
+                    options=chrome_options
+                )
+            else:
+                raise FileNotFoundError("ChromeDriver not in PATH")
+        except Exception:
+            # Fallback to ChromeDriverManager if system ChromeDriver not found
+            driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
+                options=chrome_options
+            )
+    else:
+        driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=chrome_options
+        )
     driver.get("https://www.linkedin.com/login")
     time.sleep(2)
 

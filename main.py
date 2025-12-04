@@ -1,8 +1,9 @@
 from utils.helpers import login, search_jobs, apply_jobs
+import os
 
 def main():
-    email = "YOUR_EMAIL"
-    password = "YOUR_PASSWORD"
+    email = os.getenv("LI_EMAIL", "YOUR_EMAIL")
+    password = os.getenv("LI_PASSWORD", "YOUR_PASSWORD")
     keywords = ["DevOps Engineer", "Cloud Engineer"]
     location = "Bangalore, India"
     apply_limit = 5
