@@ -442,7 +442,15 @@ def apply_jobs(driver, job_links, apply_limit=5):
             # Quick scroll to ensure page is loaded
             print(f"  Scrolling page...")
             driver.execute_script("window.scrollTo(0, 300);")
-            time.sleep(1)  # Reduced from 2
+            time.sleep(2)  # Increased to wait for dynamic content
+            
+            # Wait for page to fully load, especially for dynamic content
+            try:
+                WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+            except:
+                pass
 
             # Try multiple selectors for Easy Apply button with shorter timeout
             print(f"  Looking for Easy Apply button...")
@@ -505,45 +513,66 @@ def apply_jobs(driver, job_links, apply_limit=5):
                     pass
 
             if not easy_apply:
+                print(f"  Initial selectors didn't find Easy Apply. Trying alternative methods...")
                 # Debug: Check what apply buttons are available and their text
                 try:
-                    apply_buttons = driver.find_elements(By.XPATH, "//button[contains(., 'Apply') or contains(@aria-label, 'Apply')]")
+                    # Wait a bit more for dynamic content
+                    time.sleep(1)
+                    
+                    # Try to find all buttons with "apply" in them
+                    apply_buttons = driver.find_elements(By.XPATH, "//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'apply') or contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'apply')]")
+                    
+                    if not apply_buttons:
+                        # Try without case sensitivity
+                        apply_buttons = driver.find_elements(By.XPATH, "//button[contains(., 'Apply') or contains(@aria-label, 'Apply')]")
+                    
                     if apply_buttons:
                         print(f"  Debug: Found {len(apply_buttons)} apply-related buttons:")
-                        for i, btn in enumerate(apply_buttons[:3], 1):  # Show first 3
+                        for i, btn in enumerate(apply_buttons[:5], 1):  # Show first 5
                             try:
-                                btn_text = btn.text.strip()
-                                btn_aria = btn.get_attribute("aria-label") or ""
-                                btn_class = btn.get_attribute("class") or ""
-                                print(f"    Button {i}: text='{btn_text[:50]}', aria-label='{btn_aria[:50]}', class='{btn_class[:50]}'")
-                            except:
-                                pass
+                                if btn.is_displayed():
+                                    btn_text = btn.text.strip()
+                                    btn_aria = btn.get_attribute("aria-label") or ""
+                                    btn_class = btn.get_attribute("class") or ""
+                                    btn_data = btn.get_attribute("data-control-name") or ""
+                                    print(f"    Button {i}: text='{btn_text[:60]}', aria='{btn_aria[:60]}', data='{btn_data[:60]}'")
+                            except Exception as e:
+                                print(f"    Button {i}: Error reading - {str(e)[:30]}")
                         
-                        # Try to use the first apply button if it looks like it could be Easy Apply
-                        # Sometimes LinkedIn uses "Apply" instead of "Easy Apply" in the button text
+                        # Try to use apply buttons that might be Easy Apply
                         for btn in apply_buttons:
                             try:
                                 if btn.is_displayed():
                                     btn_text = (btn.text or "").lower()
                                     btn_aria = (btn.get_attribute("aria-label") or "").lower()
-                                    btn_id = btn.get_attribute("id") or ""
+                                    btn_data = (btn.get_attribute("data-control-name") or "").lower()
+                                    btn_class = (btn.get_attribute("class") or "").lower()
                                     
-                                    # Check if it's likely an Easy Apply button (not a regular apply)
-                                    # Easy Apply buttons usually don't have "company website" or "external" in them
-                                    if "company website" not in btn_text and "external" not in btn_text:
-                                        # Check for Easy Apply indicators in class or data attributes
-                                        btn_data = btn.get_attribute("data-control-name") or ""
-                                        if "inapply" in btn_data.lower() or "easy" in btn_text or "easy" in btn_aria:
-                                            easy_apply = btn
-                                            print(f"  ✓ Found Easy Apply button (alternative detection)")
-                                            break
-                            except:
+                                    # Exclude buttons that redirect externally
+                                    if "company website" in btn_text or "external" in btn_text or "redirect" in btn_text:
+                                        continue
+                                    
+                                    # Check for Easy Apply indicators
+                                    if ("inapply" in btn_data or 
+                                        "easy" in btn_text or 
+                                        "easy" in btn_aria or
+                                        "jobs-apply-button" in btn_class or
+                                        "jobdetails_topcard_inapply" in btn_data):
+                                        easy_apply = btn
+                                        print(f"  ✓ Found Easy Apply button using alternative detection!")
+                                        print(f"     Text: '{btn.text[:50]}', Data: '{btn_data[:50]}'")
+                                        break
+                            except Exception as e:
                                 continue
+                    else:
+                        print(f"  Debug: No apply buttons found at all on this page")
                 except Exception as e:
-                    print(f"  Debug error: {str(e)[:50]}")
+                    print(f"  Debug error: {str(e)[:100]}")
+                    import traceback
+                    print(f"  Traceback: {traceback.format_exc()[:200]}")
                 
                 if not easy_apply:
-                    print(f"  ✗ Easy Apply not available. Skipping...")
+                    print(f"  ✗ Easy Apply not available. Skipping this job...")
                     continue
             
             # Quick experience level check (with timeout)
