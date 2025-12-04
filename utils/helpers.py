@@ -583,29 +583,29 @@ def apply_jobs(driver, job_links, apply_limit=5):
 
         # Close modal if still open
         time.sleep(1)  # Reduced from 2
-            close_selectors = [
-                ".artdeco-modal__dismiss",
-                "button[aria-label='Dismiss']",
-                "//button[contains(@aria-label, 'Dismiss')]",
-                "//button[@data-control-name='dismiss']"
-            ]
-            
-            for selector in close_selectors:
-                try:
-                    if selector.startswith("//"):
-                        close_btns = driver.find_elements(By.XPATH, selector)
-                    else:
-                        close_btns = driver.find_elements(By.CSS_SELECTOR, selector)
-                    
-                    for btn in close_btns:
-                        if btn.is_displayed():
-                            try:
-                                driver.execute_script("arguments[0].click();", btn)
-                                time.sleep(1)
-                            except:
-                                pass
-                except:
-                    pass
+        close_selectors = [
+            ".artdeco-modal__dismiss",
+            "button[aria-label='Dismiss']",
+            "//button[contains(@aria-label, 'Dismiss')]",
+            "//button[@data-control-name='dismiss']"
+        ]
+        
+        for selector in close_selectors:
+            try:
+                if selector.startswith("//"):
+                    close_btns = driver.find_elements(By.XPATH, selector)
+                else:
+                    close_btns = driver.find_elements(By.CSS_SELECTOR, selector)
+                
+                for btn in close_btns:
+                    if btn.is_displayed():
+                        try:
+                            driver.execute_script("arguments[0].click();", btn)
+                            time.sleep(1)
+                        except:
+                            pass
+            except:
+                pass
 
         except TimeoutException as e:
             print(f"  ✗ Timeout error processing job: {str(e)[:100]}. Skipping...")
