@@ -431,181 +431,178 @@ def apply_jobs(driver, job_links, apply_limit=5):
             continue
 
         print(f"\n[{idx}/{total_jobs}] Processing job...")
-        print(f"  Loading job page: {link[:80]}...")
         try:
+            print(f"  Loading job page: {link[:80]}...")
             # Set page load timeout
             driver.set_page_load_timeout(15)
             driver.get(link)
             print(f"  Page loaded successfully")
             time.sleep(2)  # Reduced from 3
-        except Exception as e:
-            print(f"  ✗ Error loading page: {str(e)[:100]}. Skipping...")
-            continue
 
-        # Quick scroll to ensure page is loaded
-        print(f"  Scrolling page...")
-        driver.execute_script("window.scrollTo(0, 300);")
-        time.sleep(1)  # Reduced from 2
-
-        # Try multiple selectors for Easy Apply button with shorter timeout
-        print(f"  Looking for Easy Apply button...")
-        easy_apply = None
-        selectors = [
-            "button.jobs-apply-button",
-            "button[data-control-name='jobdetails_topcard_inapply']",
-            "button.jobs-s-apply__application-button",
-            "//button[contains(@aria-label, 'Easy Apply')]",
-            "//button[contains(text(), 'Easy Apply')]"
-        ]
-
-        # Use shorter timeout for faster checking
-        quick_wait = WebDriverWait(driver, 3)
-        for selector in selectors:
-            try:
-                if selector.startswith("//"):
-                    easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
-                else:
-                    easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
-                if easy_apply and easy_apply.is_displayed():
-                    print(f"  ✓ Easy Apply button found using: {selector}")
-                    break
-                else:
-                    easy_apply = None
-            except (NoSuchElementException, TimeoutException):
-                continue
-
-        if not easy_apply:
-            print(f"  ✗ Easy Apply not available. Skipping...")
-            continue
-        
-        # Quick experience level check (with timeout)
-        print(f"  Checking experience level...")
-        try:
-            if not check_experience_level(driver):
-                print(f"  ✗ Requires more than 2 years experience. Skipping...")
-                continue
-        except Exception as e:
-            print(f"  ⚠ Could not verify experience: {str(e)[:50]}. Continuing anyway...")
-        
-        print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
-
-        # Click Easy Apply button
-        print(f"  Clicking Easy Apply button...")
-        try:
-            driver.execute_script("arguments[0].click();", easy_apply)
-            time.sleep(2)  # Reduced from 3
-        except ElementClickInterceptedException:
-            print(f"  ✗ Could not click Easy Apply button. Skipping...")
-            continue
-
-        # Handle multi-step application process
-        print(f"  Processing application form...")
-        max_steps = 5
-        step = 0
-        
-        while step < max_steps:
-            step += 1
+            # Quick scroll to ensure page is loaded
+            print(f"  Scrolling page...")
+            driver.execute_script("window.scrollTo(0, 300);")
             time.sleep(1)  # Reduced from 2
-            
-            # Check if there's a submit button
-            submit_selectors = [
-                "button[aria-label='Submit application']",
-                "button[aria-label='Submit']",
-                "//button[contains(@aria-label, 'Submit')]",
-                "button.jobs-s-apply__application-button--submit"
+
+            # Try multiple selectors for Easy Apply button with shorter timeout
+            print(f"  Looking for Easy Apply button...")
+            easy_apply = None
+            selectors = [
+                "button.jobs-apply-button",
+                "button[data-control-name='jobdetails_topcard_inapply']",
+                "button.jobs-s-apply__application-button",
+                "//button[contains(@aria-label, 'Easy Apply')]",
+                "//button[contains(text(), 'Easy Apply')]"
             ]
-            
-            submit_btn = None
-            for selector in submit_selectors:
+
+            # Use shorter timeout for faster checking
+            quick_wait = WebDriverWait(driver, 3)
+            for selector in selectors:
                 try:
                     if selector.startswith("//"):
-                        submit_btn = driver.find_element(By.XPATH, selector)
+                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.XPATH, selector)))
                     else:
-                        submit_btn = driver.find_element(By.CSS_SELECTOR, selector)
-                    if submit_btn and submit_btn.is_displayed() and submit_btn.is_enabled():
+                        easy_apply = quick_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                    if easy_apply and easy_apply.is_displayed():
+                        print(f"  ✓ Easy Apply button found using: {selector}")
                         break
-                except NoSuchElementException:
+                    else:
+                        easy_apply = None
+                except (NoSuchElementException, TimeoutException):
                     continue
 
-            if submit_btn:
-                try:
-                    # Scroll to submit button
-                    driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
-                    time.sleep(0.5)  # Reduced from 1
-                    driver.execute_script("arguments[0].click();", submit_btn)
-                    print(f"  ✓ Successfully applied to job!")
-                    applied_count += 1
-                    
-                    # Mark job as applied in tracking data
-                    tracking_data = mark_job_as_applied(link, tracking_data)
-                    save_applied_jobs(tracking_data)
-                    today_count = get_today_applied_count(tracking_data)
-                    print(f"  Daily applications: {today_count}/{daily_limit}")
-                    
-                    time.sleep(2)  # Reduced from 3
-                    break
-                except Exception as e:
-                    print(f"  ✗ Error clicking submit button: {str(e)[:50]}")
-                    break
-
-            # Check for "Next" button to continue multi-step form
-            next_selectors = [
-                "button[aria-label='Continue to next step']",
-                "button[aria-label='Next']",
-                "//button[contains(@aria-label, 'Next')]",
-                "//button[contains(@aria-label, 'Continue')]"
-            ]
+            if not easy_apply:
+                print(f"  ✗ Easy Apply not available. Skipping...")
+                continue
             
-            next_btn = None
-            for selector in next_selectors:
-                try:
-                    if selector.startswith("//"):
-                        next_btn = driver.find_element(By.XPATH, selector)
-                    else:
-                        next_btn = driver.find_element(By.CSS_SELECTOR, selector)
-                    if next_btn.is_displayed() and next_btn.is_enabled():
-                        break
-                except NoSuchElementException:
-                    continue
-
-            if next_btn:
-                try:
-                    driver.execute_script("arguments[0].click();", next_btn)
-                    time.sleep(1)  # Reduced from 2
-                    continue
-                except Exception as e:
-                    print(f"  ✗ Error clicking next button: {str(e)[:50]}")
-                    break
-            else:
-                # No next or submit button found, might be stuck
-                print(f"  ✗ Could not find submit/next button. Skipping...")
-                break
-
-        # Close modal if still open
-        time.sleep(1)  # Reduced from 2
-        close_selectors = [
-            ".artdeco-modal__dismiss",
-            "button[aria-label='Dismiss']",
-            "//button[contains(@aria-label, 'Dismiss')]",
-            "//button[@data-control-name='dismiss']"
-        ]
-        
-        for selector in close_selectors:
+            # Quick experience level check (with timeout)
+            print(f"  Checking experience level...")
             try:
-                if selector.startswith("//"):
-                    close_btns = driver.find_elements(By.XPATH, selector)
-                else:
-                    close_btns = driver.find_elements(By.CSS_SELECTOR, selector)
+                if not check_experience_level(driver):
+                    print(f"  ✗ Requires more than 2 years experience. Skipping...")
+                    continue
+            except Exception as e:
+                print(f"  ⚠ Could not verify experience: {str(e)[:50]}. Continuing anyway...")
+            
+            print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
+
+            # Click Easy Apply button
+            print(f"  Clicking Easy Apply button...")
+            try:
+                driver.execute_script("arguments[0].click();", easy_apply)
+                time.sleep(2)  # Reduced from 3
+            except ElementClickInterceptedException:
+                print(f"  ✗ Could not click Easy Apply button. Skipping...")
+                continue
+
+            # Handle multi-step application process
+            print(f"  Processing application form...")
+            max_steps = 5
+            step = 0
+            
+            while step < max_steps:
+                step += 1
+                time.sleep(1)  # Reduced from 2
                 
-                for btn in close_btns:
-                    if btn.is_displayed():
-                        try:
-                            driver.execute_script("arguments[0].click();", btn)
-                            time.sleep(1)
-                        except:
-                            pass
-            except:
-                pass
+                # Check if there's a submit button
+                submit_selectors = [
+                    "button[aria-label='Submit application']",
+                    "button[aria-label='Submit']",
+                    "//button[contains(@aria-label, 'Submit')]",
+                    "button.jobs-s-apply__application-button--submit"
+                ]
+                
+                submit_btn = None
+                for selector in submit_selectors:
+                    try:
+                        if selector.startswith("//"):
+                            submit_btn = driver.find_element(By.XPATH, selector)
+                        else:
+                            submit_btn = driver.find_element(By.CSS_SELECTOR, selector)
+                        if submit_btn and submit_btn.is_displayed() and submit_btn.is_enabled():
+                            break
+                    except NoSuchElementException:
+                        continue
+
+                if submit_btn:
+                    try:
+                        # Scroll to submit button
+                        driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
+                        time.sleep(0.5)  # Reduced from 1
+                        driver.execute_script("arguments[0].click();", submit_btn)
+                        print(f"  ✓ Successfully applied to job!")
+                        applied_count += 1
+                        
+                        # Mark job as applied in tracking data
+                        tracking_data = mark_job_as_applied(link, tracking_data)
+                        save_applied_jobs(tracking_data)
+                        today_count = get_today_applied_count(tracking_data)
+                        print(f"  Daily applications: {today_count}/{daily_limit}")
+                        
+                        time.sleep(2)  # Reduced from 3
+                        break
+                    except Exception as e:
+                        print(f"  ✗ Error clicking submit button: {str(e)[:50]}")
+                        break
+
+                # Check for "Next" button to continue multi-step form
+                next_selectors = [
+                    "button[aria-label='Continue to next step']",
+                    "button[aria-label='Next']",
+                    "//button[contains(@aria-label, 'Next')]",
+                    "//button[contains(@aria-label, 'Continue')]"
+                ]
+                
+                next_btn = None
+                for selector in next_selectors:
+                    try:
+                        if selector.startswith("//"):
+                            next_btn = driver.find_element(By.XPATH, selector)
+                        else:
+                            next_btn = driver.find_element(By.CSS_SELECTOR, selector)
+                        if next_btn.is_displayed() and next_btn.is_enabled():
+                            break
+                    except NoSuchElementException:
+                        continue
+
+                if next_btn:
+                    try:
+                        driver.execute_script("arguments[0].click();", next_btn)
+                        time.sleep(1)  # Reduced from 2
+                        continue
+                    except Exception as e:
+                        print(f"  ✗ Error clicking next button: {str(e)[:50]}")
+                        break
+                else:
+                    # No next or submit button found, might be stuck
+                    print(f"  ✗ Could not find submit/next button. Skipping...")
+                    break
+
+            # Close modal if still open
+            time.sleep(1)  # Reduced from 2
+            close_selectors = [
+                ".artdeco-modal__dismiss",
+                "button[aria-label='Dismiss']",
+                "//button[contains(@aria-label, 'Dismiss')]",
+                "//button[@data-control-name='dismiss']"
+            ]
+            
+            for selector in close_selectors:
+                try:
+                    if selector.startswith("//"):
+                        close_btns = driver.find_elements(By.XPATH, selector)
+                    else:
+                        close_btns = driver.find_elements(By.CSS_SELECTOR, selector)
+                    
+                    for btn in close_btns:
+                        if btn.is_displayed():
+                            try:
+                                driver.execute_script("arguments[0].click();", btn)
+                                time.sleep(1)
+                            except:
+                                pass
+                except:
+                    pass
 
         except TimeoutException as e:
             print(f"  ✗ Timeout error processing job: {str(e)[:100]}. Skipping...")
