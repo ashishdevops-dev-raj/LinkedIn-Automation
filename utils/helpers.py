@@ -9,9 +9,20 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 import json
 import os
+import base64
 from datetime import datetime, date
 
-def login(email, password):
+def load_cookies_from_b64(cookies_b64):
+    """Load cookies from base64 encoded JSON string"""
+    try:
+        cookies_json = base64.b64decode(cookies_b64).decode('utf-8')
+        cookies = json.loads(cookies_json)
+        return cookies
+    except Exception as e:
+        print(f"Error loading cookies: {e}")
+        return None
+
+def login(email, password, cookies_b64=None):
     chrome_options = Options()
     # Enable headless mode for CI environments
     import os
@@ -58,6 +69,49 @@ def login(email, password):
         )
     # Set page load timeout to prevent infinite waits
     driver.set_page_load_timeout(30)
+    
+    # Try to use cookies if provided
+    if cookies_b64:
+        print("Attempting to restore session using cookies...")
+        try:
+            cookies = load_cookies_from_b64(cookies_b64)
+            if cookies:
+                # First, navigate to LinkedIn to set the domain
+                driver.get("https://www.linkedin.com")
+                time.sleep(2)
+                
+                # Add cookies
+                for cookie in cookies:
+                    try:
+                        # Remove 'expiry' if present and convert to 'expires' if needed
+                        if 'expiry' in cookie:
+                            cookie['expires'] = cookie.pop('expiry')
+                        # Ensure domain is set correctly
+                        if 'domain' not in cookie or not cookie['domain']:
+                            cookie['domain'] = '.linkedin.com'
+                        driver.add_cookie(cookie)
+                    except Exception as e:
+                        print(f"  Warning: Could not add cookie: {str(e)[:50]}")
+                        continue
+                
+                # Refresh page to apply cookies
+                driver.refresh()
+                time.sleep(3)
+                
+                # Check if we're logged in
+                current_url = driver.current_url
+                if "login" not in current_url.lower() and "checkpoint" not in current_url.lower():
+                    print("✓ Session restored successfully using cookies!")
+                    print(f"Current URL: {current_url}")
+                    return driver
+                else:
+                    print("⚠ Cookies didn't restore session. Falling back to login...")
+            else:
+                print("⚠ Could not parse cookies. Falling back to login...")
+        except Exception as e:
+            print(f"⚠ Error using cookies: {str(e)[:100]}. Falling back to login...")
+    
+    # Fall back to normal login if cookies not provided or failed
     print("Loading LinkedIn login page...")
     driver.get("https://www.linkedin.com/login")
     time.sleep(2)

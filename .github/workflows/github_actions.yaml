@@ -51,4 +51,5 @@ jobs:
         env:
           LI_EMAIL: ${{ secrets.LI_EMAIL }}
           LI_PASSWORD: ${{ secrets.LI_PASSWORD }}
+          COOKIES_B64: ${{ secrets.COOKIES_B64 }}
         run: python main.py
