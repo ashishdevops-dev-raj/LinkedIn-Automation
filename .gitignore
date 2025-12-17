@@ -1,5 +1,4 @@
+*.pyc
 __pycache__/
+linkedin_automation.log
 .env
-*.log
-.vscode/
-.idea/
