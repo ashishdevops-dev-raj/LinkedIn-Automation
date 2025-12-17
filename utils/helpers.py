@@ -493,10 +493,20 @@ def apply_jobs(driver, job_links, apply_limit=5):
             print(f"  Page loaded successfully")
             time.sleep(2)  # Reduced from 3
 
+            # Check if we're on a checkpoint page
+            current_url = driver.current_url
+            if "checkpoint" in current_url.lower() or "challenge" in current_url.lower():
+                print(f"  ⚠ On checkpoint page. Cannot access job details. Skipping...")
+                continue
+            
             # Quick scroll to ensure page is loaded
             print(f"  Scrolling page...")
             driver.execute_script("window.scrollTo(0, 300);")
             time.sleep(2)  # Increased to wait for dynamic content
+            
+            # Scroll more to trigger lazy loading
+            driver.execute_script("window.scrollTo(0, 600);")
+            time.sleep(1)
             
             # Wait for page to fully load, especially for dynamic content
             try:
@@ -647,13 +657,22 @@ def apply_jobs(driver, job_links, apply_limit=5):
                     continue
             
             # Quick experience level check (with timeout)
+            # Since we already filter with f_E=2 (Entry level), we can be less strict
             print(f"  Checking experience level...")
             try:
-                if not check_experience_level(driver):
+                experience_result = check_experience_level(driver)
+                # Only skip if explicitly False (clearly requires more than 2 years)
+                # If None or True, proceed (we already filtered for Entry level)
+                if experience_result is False:
                     print(f"  ✗ Requires more than 2 years experience. Skipping...")
                     continue
+                elif experience_result is True:
+                    print(f"  ✓ Experience level verified (0-2 years)")
+                else:
+                    # Can't determine, but we filtered for Entry level, so proceed
+                    print(f"  ⚠ Could not verify experience, but filtered for Entry level. Proceeding...")
             except Exception as e:
-                print(f"  ⚠ Could not verify experience: {str(e)[:50]}. Continuing anyway...")
+                print(f"  ⚠ Could not verify experience: {str(e)[:50]}. Continuing (filtered for Entry level)...")
             
             print(f"  ✓ Job qualifies (Easy Apply, 0-2 years)")
 
