@@ -33,7 +33,6 @@ def login(driver, email, password):
     driver.find_element(By.ID, "password").send_keys(password)
     driver.find_element(By.XPATH, "//button[@type='submit']").click()
 
-    # Do NOT hard-fail on home page load (LinkedIn blocks CI)
     try:
         wait.until(
             EC.any_of(
