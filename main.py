@@ -1,7 +1,6 @@
 import os
 from utils.helpers import get_driver, login, search_jobs, easy_apply
 
-
 def main():
     email = os.getenv("LI_EMAIL")
     password = os.getenv("LI_PASSWORD")
