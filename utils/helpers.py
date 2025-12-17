@@ -594,6 +594,7 @@ def apply_jobs(driver, job_links, apply_limit=5):
                                 print(f"    Button {i}: Error reading - {str(e)[:30]}")
                         
                         # Try to use apply buttons that might be Easy Apply
+                        # Since we filtered with f_EA=true, "Apply" buttons are likely Easy Apply
                         for btn in apply_buttons:
                             try:
                                 if btn.is_displayed():
@@ -601,9 +602,14 @@ def apply_jobs(driver, job_links, apply_limit=5):
                                     btn_aria = (btn.get_attribute("aria-label") or "").lower()
                                     btn_data = (btn.get_attribute("data-control-name") or "").lower()
                                     btn_class = (btn.get_attribute("class") or "").lower()
+                                    btn_href = btn.get_attribute("href") or ""
                                     
-                                    # Exclude buttons that redirect externally
-                                    if "company website" in btn_text or "external" in btn_text or "redirect" in btn_text:
+                                    # Exclude buttons that redirect externally or to company website
+                                    if ("company website" in btn_text or 
+                                        "external" in btn_text or 
+                                        "redirect" in btn_text or
+                                        "http" in btn_href.lower() or
+                                        "www." in btn_href.lower()):
                                         continue
                                     
                                     # Check for Easy Apply indicators
@@ -616,6 +622,17 @@ def apply_jobs(driver, job_links, apply_limit=5):
                                         print(f"  ✓ Found Easy Apply button using alternative detection!")
                                         print(f"     Text: '{btn.text[:50]}', Data: '{btn_data[:50]}'")
                                         break
+                                    
+                                    # Since we filtered for Easy Apply (f_EA=true), if button just says "Apply"
+                                    # and doesn't have external redirect, it's likely Easy Apply
+                                    if btn_text.strip() == "apply" and not btn_href:
+                                        # Check if it's a button (not a link) - Easy Apply is usually a button
+                                        tag_name = btn.tag_name.lower()
+                                        if tag_name == "button":
+                                            easy_apply = btn
+                                            print(f"  ✓ Found Easy Apply button (filtered for Easy Apply, button says 'Apply')")
+                                            print(f"     Text: '{btn.text[:50]}', Tag: '{tag_name}'")
+                                            break
                             except Exception as e:
                                 continue
                     else:
