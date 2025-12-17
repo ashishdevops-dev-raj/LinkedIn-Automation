@@ -7,7 +7,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 def get_driver():
@@ -16,10 +15,11 @@ def get_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-software-rasterizer")
     options.add_argument("--window-size=1920,1080")
 
-    service = Service(ChromeDriverManager().install())
+    # GitHub Actions runner already has chromedriver installed
+    service = Service("/usr/bin/chromedriver")
+
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
@@ -32,7 +32,6 @@ def login(driver, email, password):
     driver.find_element(By.ID, "password").send_keys(password)
     driver.find_element(By.XPATH, "//button[@type='submit']").click()
 
-    # wait until homepage loads
     wait.until(EC.presence_of_element_located((By.ID, "global-nav-search")))
 
 
@@ -58,7 +57,7 @@ def search_jobs(driver, keyword="DevOps Engineer", location="India"):
 
         time.sleep(5)
     except TimeoutException:
-        raise Exception("LinkedIn blocked automation or UI changed")
+        print("LinkedIn blocked automation or UI changed")
 
 
 def easy_apply(driver, max_apply=5):
