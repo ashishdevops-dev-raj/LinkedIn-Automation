@@ -1,9 +1,9 @@
 name: LinkedIn Automation Daily
 
 on:
-  schedule:
+ #  schedule:
     # Runs every day at 9 AM IST (UTC 3:30 AM)
-    - cron: '30 3 * * *'
+  #  - cron: '30 3 * * *'
   workflow_dispatch: # Allows manual trigger
 
 jobs:
